@@ -1,0 +1,69 @@
+{
+  "dashboard": {
+    "id": null,
+    "uid": "weather-service",
+    "title": "Weather Service Monitoring",
+    "tags": ["golang", "microservice", "production"],
+    "timezone": "browser",
+    "refresh": "10s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Request Rate",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "rate(http_requests_total{job=\"weather-service\"}[5m])",
+            "legendFormat": "{{method}} {{path}} - {{status_code}}"
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Response Time",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job=\"weather-service\"}[5m]))",
+            "legendFormat": "95th percentile"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(http_request_duration_seconds_bucket{job=\"weather-service\"}[5m]))",
+            "legendFormat": "99th percentile"
+          },
+          {
+            "expr": "histogram_quantile(0.50, rate(http_request_duration_seconds_bucket{job=\"weather-service\"}[5m]))",
+            "legendFormat": "50th percentile"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Error Rate",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+        "targets": [
+          {
+            "expr": "rate(errors_total{job=\"weather-service\"}[5m])",
+            "legendFormat": "{{type}}"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Circuit Breaker Status",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 12, "y": 8},
+        "targets": [
+          {
+            "expr": "circuit_breaker_state{job=\"weather-service\"}",
+            "legendFormat": "{{name}}"
+          }
+        ]
+      }
+    ]
+  },
+  "overwrite": true
+}

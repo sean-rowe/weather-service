@@ -1,0 +1,121 @@
+# GCP Cloud Build pipeline configuration
+# Demonstrates CI/CD expertise with Go microservices
+
+steps:
+  # Step 1: Run unit tests
+  - name: 'golang:1.21'
+    id: 'unit-tests'
+    entrypoint: 'sh'
+    args:
+      - '-c'
+      - |
+        echo "Running unit tests with coverage..."
+        go test -v -race -coverprofile=coverage.out ./...
+        go tool cover -func=coverage.out
+        
+  # Step 2: Run integration tests
+  - name: 'golang:1.21'
+    id: 'integration-tests'
+    entrypoint: 'sh'
+    args:
+      - '-c'
+      - |
+        echo "Running integration tests..."
+        go test -v -tags=integration ./...
+    waitFor: ['unit-tests']
+
+  # Step 3: Static code analysis
+  - name: 'golangci/golangci-lint:latest'
+    id: 'lint'
+    args: ['golangci-lint', 'run', '--timeout', '5m']
+    waitFor: ['-']
+
+  # Step 4: Security scanning
+  - name: 'securego/gosec:latest'
+    id: 'security-scan'
+    args: ['-fmt=json', '-out=gosec-report.json', './...']
+    waitFor: ['-']
+
+  # Step 5: Build Docker image (using Artifact Registry)
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-image'
+    args:
+      - 'build'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/weather-service:$SHORT_SHA'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/weather-service:latest'
+      - '--build-arg'
+      - 'VERSION=$TAG_NAME'
+      - '.'
+    waitFor: ['unit-tests', 'integration-tests']
+
+  # Step 6: Push to Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-image'
+    args:
+      - 'push'
+      - '--all-tags'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/weather-service'
+    waitFor: ['build-image']
+
+  # Step 7: Deploy to GKE staging
+  - name: 'gcr.io/cloud-builders/gke-deploy'
+    id: 'deploy-staging'
+    args:
+      - 'run'
+      - '--filename=k8s/staging/'
+      - '--image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/weather-service:$SHORT_SHA'
+      - '--cluster=staging-cluster'
+      - '--location=${_GKE_LOCATION}'
+      - '--namespace=weather-service-staging'
+    waitFor: ['push-image']
+
+  # Step 8: Run smoke tests
+  - name: 'golang:1.21'
+    id: 'smoke-tests'
+    entrypoint: 'sh'
+    args:
+      - '-c'
+      - |
+        echo "Running smoke tests against staging..."
+        go test -v -tags=smoke ./tests/smoke
+    env:
+      - 'TEST_URL=https://staging.weather-service.example.com'
+    waitFor: ['deploy-staging']
+
+  # Step 9: Deploy to production (manual approval required)
+  - name: 'gcr.io/cloud-builders/gke-deploy'
+    id: 'deploy-production'
+    args:
+      - 'run'
+      - '--filename=k8s/production/'
+      - '--image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/weather-service:$SHORT_SHA'
+      - '--cluster=production-cluster'
+      - '--location=${_GKE_LOCATION}'
+      - '--namespace=weather-service'
+    waitFor: ['smoke-tests']
+
+# Substitutions for environment-specific values
+substitutions:
+  _GKE_CLUSTER: 'weather-service-cluster'
+  _GKE_LOCATION: 'us-central1'
+  _NAMESPACE: 'weather-service'
+  _REGION: 'us-central1'
+  _REPOSITORY: 'weather-service'
+
+# Build timeout
+timeout: '30m'
+
+# Build options
+options:
+  machineType: 'N1_HIGHCPU_8'
+  logging: CLOUD_LOGGING_ONLY
+  
+# Artifacts to store
+artifacts:
+  objects:
+    location: 'gs://${PROJECT_ID}_build_artifacts'
+    paths:
+      - 'coverage.out'
+      - 'gosec-report.json'
