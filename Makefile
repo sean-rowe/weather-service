@@ -8,7 +8,19 @@ BINARY_NAME=weather-service
 DOCKER_IMAGE=weather-service:latest
 GO=go
 GOFLAGS=-v
-LDFLAGS=-ldflags "-s -w"
+
+# Version information
+VERSION?=1.0.0
+BUILD_TIME=$(shell date -u '+%Y-%m-%dT%H:%M:%SZ')
+GIT_COMMIT=$(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+GIT_BRANCH=$(shell git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
+
+# Build flags
+LDFLAGS=-ldflags "-s -w \
+	-X github.com/sean-rowe/weather-service/internal/version.Version=$(VERSION) \
+	-X github.com/sean-rowe/weather-service/internal/version.BuildTime=$(BUILD_TIME) \
+	-X github.com/sean-rowe/weather-service/internal/version.GitCommit=$(GIT_COMMIT) \
+	-X github.com/sean-rowe/weather-service/internal/version.GitBranch=$(GIT_BRANCH)"
 
 # Default target - show help
 help: ## Show this help message
@@ -25,7 +37,7 @@ run: ## Run the application locally (without Docker)
 	DATABASE_ENABLED=false $(GO) run ./cmd/server
 
 run-with-db: ## Run locally with database
-	DB_HOST=localhost DB_PORT=5432 DB_USER=weather DB_PASSWORD=weather123 DB_NAME=weather_service \
+	DB_HOST=localhost DB_PORT=5432 DB_USER=weather DB_PASSWORD="${DB_PASSWORD}" DB_NAME=weather_service \
 	DATABASE_ENABLED=true $(GO) run ./cmd/server
 
 test: ## Run unit tests
@@ -53,9 +65,9 @@ compose-up: ## Start all services with docker-compose (PostgreSQL, monitoring, a
 	@echo "Services starting..."
 	@echo "Weather Service: http://localhost:8080"
 	@echo "Prometheus: http://localhost:9090"
-	@echo "Grafana: http://localhost:3000 (admin/admin)"
+	@echo "Grafana: http://localhost:3000 (admin/[use GF_SECURITY_ADMIN_PASSWORD])"
 	@echo "Jaeger: http://localhost:16686"
-	@echo "PostgreSQL: localhost:5432 (weather/weather123)"
+	@echo "PostgreSQL: localhost:5432 (weather/[use DB_PASSWORD])"
 
 compose-down: ## Stop all docker-compose services
 	docker-compose down
@@ -80,8 +92,17 @@ k8s-port-forward: ## Port forward to access service
 	kubectl port-forward service/weather-service 8080:80
 
 # Database Commands
-db-migrate: ## Run database migrations
-	@echo "Database tables are created automatically on startup"
+migrate-up: ## Run all pending database migrations
+	$(GO) run ./cmd/migrate -action=up
+
+migrate-down: ## Rollback last database migration
+	$(GO) run ./cmd/migrate -action=down
+
+migrate-version: ## Migrate to specific version (use with VERSION=n)
+	$(GO) run ./cmd/migrate -action=version -version=$(VERSION)
+
+migrate-force: ## Force set migration version (use with VERSION=n)
+	$(GO) run ./cmd/migrate -action=force -version=$(VERSION)
 
 db-shell: ## Connect to PostgreSQL shell
 	docker exec -it weather-postgres psql -U weather -d weather_service

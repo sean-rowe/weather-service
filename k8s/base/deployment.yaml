@@ -4,7 +4,7 @@ metadata:
   name: weather-service
   labels:
     app: weather-service
-    version: v1
+    version: v2.0
     team: platform-engineering
 spec:
   replicas: 3
@@ -16,7 +16,7 @@ spec:
     metadata:
       labels:
         app: weather-service
-        version: v1
+        version: v2.0
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/port: "8080"
@@ -43,6 +43,22 @@ spec:
           value: "info"
         - name: GCP_PROJECT_ID
           value: "jack-henry-20250812-180300"
+        - name: ENVIRONMENT
+          value: "production"
+        - name: DATABASE_ENABLED
+          value: "false"
+        - name: REDIS_ENABLED
+          value: "true"
+        - name: REDIS_ADDR
+          value: "redis:6379"
+        - name: REDIS_PASSWORD
+          value: ""
+        - name: REDIS_DB
+          value: "0"
+        - name: RATE_LIMIT_RPS
+          value: "1000"
+        - name: NWS_BASE_URL
+          value: "https://api.weather.gov"
         - name: POD_NAME
           valueFrom:
             fieldRef:
@@ -82,7 +98,7 @@ spec:
             cpu: "500m"
         livenessProbe:
           httpGet:
-            path: /health/live
+            path: /health
             port: 8080
           initialDelaySeconds: 30
           periodSeconds: 10
@@ -90,7 +106,7 @@ spec:
           failureThreshold: 3
         readinessProbe:
           httpGet:
-            path: /health/ready
+            path: /health
             port: 8080
           initialDelaySeconds: 10
           periodSeconds: 5

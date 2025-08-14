@@ -3,7 +3,7 @@
 # Setup script for local development environment
 set -e
 
-echo "🚀 Setting up Weather Service local development environment..."
+echo "Setting up Weather Service local development environment..."
 
 # Colors for output
 RED='\033[0;31m'
@@ -14,7 +14,7 @@ NC='\033[0m' # No Color
 # Check prerequisites
 check_command() {
     if ! command -v $1 &> /dev/null; then
-        echo -e "${RED}❌ $1 is not installed${NC}"
+        echo -e "${RED} $1 is not installed${NC}"
         echo "Please install $1 and try again"
         exit 1
     else
@@ -29,7 +29,7 @@ check_command make
 
 # Check Docker is running
 if ! docker info &> /dev/null; then
-    echo -e "${RED}❌ Docker is not running${NC}"
+    echo -e "${RED} Docker is not running${NC}"
     echo "Please start Docker and try again"
     exit 1
 else
@@ -69,7 +69,7 @@ else
     echo "Install kind with: brew install kind (macOS) or check https://kind.sigs.k8s.io/"
 fi
 
-echo -e "\n${GREEN}✅ Setup complete!${NC}"
+echo -e "\n${GREEN} Setup complete!${NC}"
 echo ""
 echo "Available commands:"
 echo "  make run-all      - Start all services (PostgreSQL, monitoring, app)"
@@ -84,5 +84,5 @@ echo ""
 echo "Then access:"
 echo "  Weather Service: http://localhost:8080"
 echo "  Prometheus:      http://localhost:9090"
-echo "  Grafana:         http://localhost:3000 (admin/admin)"
+echo "  Grafana:         http://localhost:3000 (admin/[use GF_SECURITY_ADMIN_PASSWORD])"
 echo "  Jaeger:          http://localhost:16686"

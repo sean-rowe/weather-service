@@ -1,17 +1,39 @@
 # Weather Service
 
-A production-ready weather service built with Go that provides weather information using the National Weather Service API.
+Production-ready Go microservice demonstrating hexagonal architecture, GKE deployment, and comprehensive monitoring. Fetches real-time weather data from the National Weather Service API with caching, rate limiting, and circuit breaker patterns.
 
 ## Features
 
+### Core Functionality
 - **RESTful API** for retrieving weather information by coordinates
 - **Temperature categorization** (hot, cold, moderate)
-- **Clean Architecture** with Domain-Driven Design
+- **Redis caching** for improved performance
+- **Rate limiting** to prevent abuse
+
+### Architecture & Design
+- **Hexagonal architecture** with clean separation of concerns
+- **Domain-Driven Design** principles
 - **SOLID principles** implementation
-- **BDD testing** with Gherkin scenarios
-- **Docker support** for containerization
-- **Comprehensive error handling** and logging
-- **Graceful shutdown** support
+- **Circuit breaker pattern** for fault tolerance
+
+### Infrastructure
+- **Docker** multi-stage builds for minimal images
+- **Kubernetes** manifests for GKE deployment
+- **Google Cloud Platform** integration (GKE, Cloud Build, Artifact Registry)
+- **PostgreSQL** for audit logging and analytics
+
+### Observability
+- **OpenTelemetry** distributed tracing
+- **Prometheus** metrics collection
+- **Grafana** dashboards for visualization
+- **Structured logging** with Zap
+- **Health checks** (liveness and readiness probes)
+
+### Testing
+- **Unit tests** with mocks and table-driven tests
+- **Integration tests** with real components
+- **BDD tests** with Cucumber/Godog
+- **Performance tests** for load testing
 
 ## Architecture
 
@@ -36,21 +58,29 @@ This service follows hexagonal architecture (ports and adapters) with clear sepa
 
 ### Prerequisites
 
-- Go 1.21 or higher
-- Docker (optional)
-- Make (optional)
+- Go 1.23 or higher
+- Docker and Docker Compose
+- Kubernetes (kubectl configured)
+- Google Cloud SDK (for GCP deployment)
+- Make
 
 ### Installation
 
 1. Clone the repository:
 ```bash
-git clone <repository-url>
+git clone https://github.com/sean-rowe/weather-service.git
 cd weather-service
 ```
 
 2. Install dependencies:
 ```bash
-make deps
+go mod download
+```
+
+3. Set up environment variables:
+```bash
+cp .env.example .env
+# Edit .env with your configuration
 ```
 
 ### Running the Service
@@ -70,13 +100,16 @@ make docker-run
 make compose-up
 ```
 
-The service will start on port 8080 by default.
+The service will start on:
+- Weather API: http://localhost:8080/api/v1/weather
+- Prometheus metrics: http://localhost:8080/metrics
+- Health check: http://localhost:8080/health
 
 ### API Usage
 
 Get weather information:
 ```bash
-curl "http://localhost:8080/weather?lat=40.7128&lon=-74.0060"
+curl "http://localhost:8080/api/v1/weather?lat=40.7128&lon=-74.0060"
 ```
 
 Response:
@@ -86,7 +119,7 @@ Response:
   "longitude": -74.0060,
   "forecast": "Partly Cloudy",
   "temperature": 75,
-  "unit": "F",
+  "temperatureUnit": "F",
   "category": "moderate"
 }
 ```
@@ -106,6 +139,39 @@ make test-bdd
 Run all checks (format, vet, lint, test):
 ```bash
 make check
+```
+
+## Deployment
+
+### Google Kubernetes Engine (GKE)
+
+1. Set up GCP project:
+```bash
+gcloud config set project YOUR_PROJECT_ID
+```
+
+2. Create GKE cluster:
+```bash
+gcloud container clusters create weather-service-cluster \
+  --zone us-central1-a \
+  --num-nodes 3
+```
+
+3. Deploy to GKE:
+```bash
+kubectl apply -f k8s/base/
+```
+
+4. Get service endpoint:
+```bash
+kubectl get service weather-service-lb
+```
+
+### Using Cloud Build
+
+Deploy directly from source:
+```bash
+gcloud builds submit --config cloudbuild.yaml .
 ```
 
 ## API Documentation
@@ -174,18 +240,25 @@ Get weather information for specific coordinates.
 - Input validation
 - HTTP timeouts
 
-### Potential Improvements for Production
-- Rate limiting
-- Metrics collection (Prometheus)
-- Distributed tracing
-- Caching layer
-- Circuit breaker for external API
-- Authentication/Authorization
+### What's Ready for Production
+- ✅ Rate limiting with Redis
+- ✅ Prometheus metrics collection
+- ✅ OpenTelemetry distributed tracing
+- ✅ Redis caching layer
+- ✅ Circuit breaker with Sony GoBreaker
+- ✅ PostgreSQL audit logging
+- ✅ Configuration management
+- ✅ Health checks and readiness probes
+- ✅ Graceful shutdown
+- ✅ GKE deployment ready
+
+### Future Enhancements
+- Authentication/Authorization (OAuth2/JWT)
 - API versioning
-- OpenAPI documentation
-- Database for audit logging
-- Configuration management (Viper)
-- Secrets management
+- OpenAPI/Swagger documentation
+- Secrets management (Google Secret Manager)
+- GraphQL endpoint
+- WebSocket support for real-time updates
 
 ## Development Workflow
 
@@ -194,13 +267,18 @@ Get weather information for specific coordinates.
 3. **Docker**: Test containerization with `make docker-run`
 4. **BDD**: Validate behavior with `make test-bdd`
 
-## Dependencies
+## Key Dependencies
 
-- **gorilla/mux**: HTTP routing
-- **zap**: Structured logging
-- **testify**: Testing assertions
-- **godog**: BDD testing framework
+- **gorilla/mux**: HTTP routing and middleware
+- **go.uber.org/zap**: High-performance structured logging
+- **lib/pq**: PostgreSQL driver
+- **go-redis/redis**: Redis client for caching
+- **sony/gobreaker**: Circuit breaker implementation
+- **opentelemetry**: Distributed tracing and metrics
+- **prometheus/client_golang**: Metrics exposition
+- **testify**: Testing assertions and mocks
+- **godog**: BDD testing with Cucumber
 
 ## License
 
-[Your License Here]
+MIT License - See [LICENSE](LICENSE) file for details

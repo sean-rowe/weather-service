@@ -1,0 +1,9 @@
+# Explicitly control what to ignore/include
+.git/
+.idea/
+.vscode/
+*.log
+*.tmp
+*.bak
+/weather-service
+# DO NOT exclude cmd/ or any source files

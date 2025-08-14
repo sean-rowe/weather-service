@@ -1,3 +1,4 @@
+#file: noinspection KubernetesUnknownResourcesInspection
 apiVersion: 1
 
 providers:

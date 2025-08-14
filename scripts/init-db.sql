@@ -8,7 +8,10 @@ BEGIN
    IF NOT EXISTS (
       SELECT FROM pg_catalog.pg_user
       WHERE usename = 'weather') THEN
-      CREATE USER weather WITH PASSWORD 'weather123';
+      -- Create user with password from environment
+      -- Password should be set via: CREATE USER weather WITH PASSWORD '<secure_password>';
+      -- This file is for reference only. Use proper secret management in production.
+      CREATE USER weather;
    END IF;
 END
 $do$;

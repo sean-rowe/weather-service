@@ -1,50 +1,77 @@
+// Package middleware provides HTTP middleware components for cross-cutting concerns.
+// It includes rate limiting, observability, logging, and security middleware
+// that can be applied to HTTP handlers.
 package middleware
 
 import (
-    "net/http"
-    "sync"
-    "golang.org/x/time/rate"
+	"net/http"
+	"strconv"
+	"time"
+
+	"go.uber.org/zap"
+
+	"github.com/sean-rowe/weather-service/internal/core/ports"
 )
 
-type RateLimiter struct {
-    visitors map[string]*rate.Limiter
-    mu       sync.RWMutex
-    r        rate.Limit
-    b        int
+// RateLimitMiddleware provides HTTP rate-limiting functionality.
+// It enforces request limits per client IP address to prevent abuse
+// and protect the service from an excessive load.
+type RateLimitMiddleware struct {
+	rateLimiter ports.RateLimitService
+	logger      *zap.Logger
+	limit       int
+	window      time.Duration
 }
 
-func NewRateLimiter(r rate.Limit, b int) *RateLimiter {
-    return &RateLimiter{
-        visitors: make(map[string]*rate.Limiter),
-        r:        r,
-        b:        b,
-    }
+// NewRateLimitMiddleware creates new rate limiting middleware.
+// It configures the middleware with the specified rate limit (requests per window)
+// and uses the provided rate limiter service for enforcement.
+func NewRateLimitMiddleware(rateLimiter ports.RateLimitService, limit int, window time.Duration, logger *zap.Logger) *RateLimitMiddleware {
+	return &RateLimitMiddleware{
+		rateLimiter: rateLimiter,
+		logger:      logger,
+		limit:       limit,
+		window:      window,
+	}
 }
 
-func (rl *RateLimiter) getVisitor(ip string) *rate.Limiter {
-    rl.mu.RLock()
-    limiter, exists := rl.visitors[ip]
-    rl.mu.RUnlock()
+// Middleware returns an HTTP handler that enforces rate limiting.
+func (rl *RateLimitMiddleware) Middleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		identifier := GetClientIP(r)
+		allowed, err := rl.rateLimiter.Allow(r.Context(), identifier, rl.limit, rl.window)
 
-    if !exists {
-        rl.mu.Lock()
-        limiter = rate.NewLimiter(rl.r, rl.b)
-        rl.visitors[ip] = limiter
-        rl.mu.Unlock()
-    }
+		if err != nil {
+			rl.logger.Error("rate limiter error",
+				zap.String("client_ip", identifier),
+				zap.Error(err),
+			)
 
-    return limiter
-}
+			next.ServeHTTP(w, r)
+			return
+		}
 
-func (rl *RateLimiter) Middleware(next http.Handler) http.Handler {
-    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-        limiter := rl.getVisitor(r.RemoteAddr)
-        
-        if !limiter.Allow() {
-            http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
-            return
-        }
-        
-        next.ServeHTTP(w, r)
-    })
+		if !allowed {
+			rl.logger.Warn("rate limit exceeded",
+				zap.String("client_ip", identifier),
+				zap.Int("limit", rl.limit),
+				zap.Duration("window", rl.window))
+
+			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("X-RateLimit-Limit", strconv.Itoa(rl.limit))
+			w.Header().Set("X-RateLimit-Window", rl.window.String())
+			w.WriteHeader(http.StatusTooManyRequests)
+
+			if _, err := w.Write([]byte(`{"error":"RATE_LIMIT_EXCEEDED","message":"Too many requests"}`)); err != nil {
+				rl.logger.Error("failed to write rate limit response", zap.Error(err))
+			}
+
+			return
+		}
+
+		w.Header().Set("X-RateLimit-Limit", strconv.Itoa(rl.limit))
+		w.Header().Set("X-RateLimit-Window", rl.window.String())
+
+		next.ServeHTTP(w, r)
+	})
 }

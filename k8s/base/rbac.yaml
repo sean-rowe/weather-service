@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: weather-service
+  namespace: default
+  labels:
+    app: weather-service
+    team: platform-engineering
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: weather-service-db
+  namespace: default
+  labels:
+    app: weather-service
+type: Opaque
+data:
+  host: "ZGlzYWJsZWQ="  # base64 "disabled"
+  password: "ZGlzYWJsZWQ="  # base64 "disabled"

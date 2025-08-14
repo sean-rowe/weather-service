@@ -1,14 +1,31 @@
 version: '3.8'
 
 services:
+  # Redis for caching and rate limiting
+  redis:
+    image: redis:7-alpine
+    container_name: weather-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - weather-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # PostgreSQL Database
   postgres:
     image: postgres:15-alpine
     container_name: weather-postgres
     environment:
-      POSTGRES_USER: weather
-      POSTGRES_PASSWORD: weather123
-      POSTGRES_DB: weather_service
+      POSTGRES_USER: ${DB_USER:-weather}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Database password must be set}
+      POSTGRES_DB: ${DB_NAME:-weather_service}
     ports:
       - "5432:5432"
     volumes:
@@ -46,8 +63,8 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_USER=${GF_SECURITY_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GF_SECURITY_ADMIN_PASSWORD:?Grafana admin password must be set}
       - GF_AUTH_ANONYMOUS_ENABLED=true
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
     volumes:
@@ -98,17 +115,24 @@ services:
       - "8080:8080"
     environment:
       - PORT=8080
-      - ENVIRONMENT=development
-      - NWS_BASE_URL=https://api.weather.gov
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - DB_USER=weather
-      - DB_PASSWORD=weather123
-      - DB_NAME=weather_service
-      - DB_SSLMODE=disable
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - NWS_BASE_URL=${NWS_BASE_URL:-https://api.weather.gov}
+      - DB_HOST=${DB_HOST:-postgres}
+      - DB_PORT=${DB_PORT:-5432}
+      - DB_USER=${DB_USER:-weather}
+      - DB_PASSWORD=${DB_PASSWORD:?Database password must be set}
+      - DB_NAME=${DB_NAME:-weather_service}
+      - DB_SSLMODE=${DB_SSLMODE:-disable}
       - DATABASE_ENABLED=true
-      - OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4317
+      - REDIS_ENABLED=true
+      - REDIS_ADDR=${REDIS_ADDR:-redis:6379}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      - REDIS_DB=${REDIS_DB:-0}
+      - RATE_LIMIT_RPS=${RATE_LIMIT_RPS:-100}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-otel-collector:4317}
     depends_on:
+      redis:
+        condition: service_healthy
       postgres:
         condition: service_healthy
       otel-collector:
@@ -118,6 +142,7 @@ services:
     restart: unless-stopped
 
 volumes:
+  redis_data:
   postgres_data:
   prometheus_data:
   grafana_data:

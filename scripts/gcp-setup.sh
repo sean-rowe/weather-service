@@ -5,23 +5,23 @@
 
 set -e
 
-echo "🚀 GCP Setup for Weather Service"
+echo "GCP Setup for Weather Service"
 echo "================================"
 
 # Check if gcloud is installed
 if ! command -v gcloud &> /dev/null; then
-    echo "❌ gcloud CLI is not installed. Please install it first."
+    echo "gcloud CLI is not installed. Please install it first."
     exit 1
 fi
 
 # Check if authenticated
 if ! gcloud auth list --filter=status:ACTIVE --format="value(account)" &> /dev/null; then
-    echo "❌ Not authenticated with GCP. Please run:"
+    echo "Not authenticated with GCP. Please run:"
     echo "   gcloud auth login"
     exit 1
 fi
 
-echo "✅ gcloud CLI found and authenticated"
+echo "gcloud CLI found and authenticated"
 
 # Function to prompt for input
 prompt_with_default() {
@@ -35,14 +35,14 @@ prompt_with_default() {
 
 # Get project configuration
 echo ""
-echo "📋 Available GCP Projects:"
+echo "Available GCP Projects:"
 gcloud projects list --format="table(projectId,name,projectNumber)"
 
 echo ""
 prompt_with_default "Enter your GCP Project ID" "" PROJECT_ID
 
 if [ -z "$PROJECT_ID" ]; then
-    echo "❌ Project ID is required"
+    echo "Project ID is required"
     exit 1
 fi
 
@@ -52,14 +52,14 @@ prompt_with_default "Enter GKE cluster name" "weather-service-cluster" CLUSTER_N
 
 # Set project configuration
 echo ""
-echo "🔧 Configuring GCP project..."
+echo "Configuring GCP project..."
 gcloud config set project $PROJECT_ID
 gcloud config set compute/region $REGION
 gcloud config set compute/zone $ZONE
 
 # Enable required APIs
 echo ""
-echo "🔌 Enabling required APIs..."
+echo "Enabling required APIs..."
 APIS=(
     "compute.googleapis.com"
     "container.googleapis.com"
@@ -80,15 +80,15 @@ done
 
 # Create Artifact Registry repository
 echo ""
-echo "📦 Setting up Artifact Registry..."
+echo "Setting up Artifact Registry..."
 REPO_NAME="weather-service"
 REPO_LOCATION=$REGION
 
-if ! gcloud artifacts repositories describe $REPO_NAME --location=$REPO_LOCATION &> /dev/null; then
+if ! gcloud artifacts repositories describe $REPO_NAME --location="$REPO_LOCATION" &> /dev/null; then
     echo "  Creating Artifact Registry repository..."
     gcloud artifacts repositories create $REPO_NAME \
         --repository-format=docker \
-        --location=$REPO_LOCATION \
+        --location="$REPO_LOCATION" \
         --description="Docker repository for weather service"
 else
     echo "  Repository $REPO_NAME already exists"
@@ -96,8 +96,8 @@ fi
 
 # Check if cluster exists
 echo ""
-echo "☸️  Checking for GKE cluster..."
-if gcloud container clusters describe $CLUSTER_NAME --zone=$ZONE &> /dev/null; then
+echo "Checking for GKE cluster..."
+if gcloud container clusters describe "$CLUSTER_NAME" --zone="$ZONE" &> /dev/null; then
     echo "  Cluster $CLUSTER_NAME already exists"
     prompt_with_default "Do you want to use the existing cluster? (y/n)" "y" USE_EXISTING
     
@@ -108,16 +108,16 @@ if gcloud container clusters describe $CLUSTER_NAME --zone=$ZONE &> /dev/null; t
 fi
 
 # Create GKE cluster if it doesn't exist
-if ! gcloud container clusters describe $CLUSTER_NAME --zone=$ZONE &> /dev/null; then
+if ! gcloud container clusters describe "$CLUSTER_NAME" --zone="$ZONE" &> /dev/null; then
     echo ""
-    echo "🏗️  Creating GKE cluster..."
+    echo "Creating GKE cluster..."
     prompt_with_default "Number of nodes" "3" NUM_NODES
     prompt_with_default "Machine type" "e2-medium" MACHINE_TYPE
     
-    gcloud container clusters create $CLUSTER_NAME \
-        --zone $ZONE \
-        --num-nodes $NUM_NODES \
-        --machine-type $MACHINE_TYPE \
+    gcloud container clusters create "$CLUSTER_NAME" \
+        --zone "$ZONE" \
+        --num-nodes "$NUM_NODES" \
+        --machine-type "$MACHINE_TYPE" \
         --enable-autoscaling \
         --min-nodes 1 \
         --max-nodes 5 \
@@ -130,21 +130,21 @@ fi
 
 # Get cluster credentials
 echo ""
-echo "🔑 Getting cluster credentials..."
-gcloud container clusters get-credentials $CLUSTER_NAME --zone=$ZONE
+echo "Getting cluster credentials..."
+gcloud container clusters get-credentials "$CLUSTER_NAME" --zone="$ZONE"
 
 # Set up Cloud Build permissions
 echo ""
-echo "🔐 Setting up Cloud Build permissions..."
-PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format='value(projectNumber)')
+echo "Setting up Cloud Build permissions..."
+PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')
 
-gcloud projects add-iam-policy-binding $PROJECT_ID \
-    --member=serviceAccount:$PROJECT_NUMBER@cloudbuild.gserviceaccount.com \
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+    --member=serviceAccount:"$PROJECT_NUMBER"@cloudbuild.gserviceaccount.com \
     --role=roles/container.developer \
     --quiet
 
-gcloud projects add-iam-policy-binding $PROJECT_ID \
-    --member=serviceAccount:$PROJECT_NUMBER@cloudbuild.gserviceaccount.com \
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+    --member=serviceAccount:"$PROJECT_NUMBER"@cloudbuild.gserviceaccount.com \
     --role=roles/artifactregistry.writer \
     --quiet
 
@@ -153,14 +153,14 @@ echo ""
 prompt_with_default "Do you want to create a Cloud SQL PostgreSQL instance? (y/n)" "n" CREATE_SQL
 
 if [ "$CREATE_SQL" == "y" ]; then
-    echo "🗄️  Creating Cloud SQL instance..."
+    echo "Creating Cloud SQL instance..."
     INSTANCE_NAME="weather-service-db"
     
     if ! gcloud sql instances describe $INSTANCE_NAME &> /dev/null; then
         gcloud sql instances create $INSTANCE_NAME \
             --database-version=POSTGRES_14 \
             --tier=db-f1-micro \
-            --region=$REGION \
+            --region="$REGION" \
             --network=default \
             --backup \
             --backup-start-time=03:00
@@ -169,9 +169,14 @@ if [ "$CREATE_SQL" == "y" ]; then
         gcloud sql databases create weather_service --instance=$INSTANCE_NAME
         
         # Set password for postgres user
+        echo "Setting database password..."
+        if [ -z "$DB_PASSWORD" ]; then
+            echo "Error: DB_PASSWORD environment variable must be set"
+            exit 1
+        fi
         gcloud sql users set-password postgres \
             --instance=$INSTANCE_NAME \
-            --password=weather123
+            --password="$DB_PASSWORD"
     else
         echo "  SQL instance $INSTANCE_NAME already exists"
     fi
@@ -179,7 +184,7 @@ fi
 
 # Update cloudbuild.yaml with correct values
 echo ""
-echo "📝 Updating cloudbuild.yaml..."
+echo "Updating cloudbuild.yaml..."
 sed -i.bak \
     -e "s/YOUR_PROJECT_ID/$PROJECT_ID/g" \
     -e "s/YOUR_CLUSTER_NAME/$CLUSTER_NAME/g" \
@@ -189,32 +194,32 @@ sed -i.bak \
 
 # Update Kubernetes manifests
 echo ""
-echo "📝 Updating Kubernetes manifests..."
+echo "Updating Kubernetes manifests..."
 find ../k8s -name "*.yaml" -type f -exec sed -i.bak \
     -e "s|gcr.io/YOUR_PROJECT_ID|$REPO_LOCATION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME|g" \
     {} \;
 
 # Create namespace in cluster
 echo ""
-echo "📁 Creating Kubernetes namespace..."
+echo "Creating Kubernetes namespace..."
 kubectl create namespace weather-service --dry-run=client -o yaml | kubectl apply -f -
 
 # Apply ConfigMap
 echo ""
-echo "⚙️  Applying ConfigMap..."
+echo "Applying ConfigMap..."
 kubectl apply -f ../k8s/base/configmap.yaml -n weather-service
 
 echo ""
-echo "✅ GCP Setup Complete!"
+echo "GCP Setup Complete!"
 echo ""
-echo "📋 Configuration Summary:"
+echo "Configuration Summary:"
 echo "  Project ID: $PROJECT_ID"
 echo "  Region: $REGION"
 echo "  Zone: $ZONE"
 echo "  GKE Cluster: $CLUSTER_NAME"
 echo "  Artifact Registry: $REPO_LOCATION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME"
 echo ""
-echo "🚀 Next Steps:"
+echo "Next Steps:"
 echo "  1. Deploy using Cloud Build:"
 echo "     cd .. && gcloud builds submit --config cloudbuild.yaml ."
 echo ""

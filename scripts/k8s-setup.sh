@@ -3,7 +3,7 @@
 # Kubernetes setup script using kind (Kubernetes in Docker)
 set -e
 
-echo "🚀 Setting up local Kubernetes cluster with kind..."
+echo "Setting up local Kubernetes cluster with kind..."
 
 # Colors
 RED='\033[0;31m'
@@ -13,7 +13,7 @@ NC='\033[0m'
 
 # Check if kind is installed
 if ! command -v kind &> /dev/null; then
-    echo -e "${RED}❌ kind is not installed${NC}"
+    echo -e "${RED} kind is not installed${NC}"
     echo "Installing kind..."
     
     # Detect OS
@@ -119,7 +119,7 @@ echo -e "\n${GREEN}Deployment status:${NC}"
 kubectl get pods -n weather-service
 kubectl get services -n weather-service
 
-echo -e "\n${GREEN}✅ Kubernetes setup complete!${NC}"
+echo -e "\n${GREEN} Kubernetes setup complete!${NC}"
 echo ""
 echo "Access the service:"
 echo "  Weather Service: http://localhost:8080"

@@ -2,6 +2,8 @@
 weather-service
 server
 /server
+migrate
+/migrate
 *.exe
 *.dll
 *.so
@@ -68,3 +70,13 @@ grafana-data/
 # Backup files from sed
 *.yaml.bak
 cloudbuild.yaml.bak
+
+# Build artifacts
+bin/
+*.exe
+
+# Temporary files from deployment/troubleshooting
+k8s-*.yaml
+cloudbuild-debug.yaml
+cloudbuild-simple.yaml
+gcp-setup.md

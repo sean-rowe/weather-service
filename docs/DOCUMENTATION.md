@@ -639,7 +639,7 @@ Tracks all weather API requests for analytics.
 | DB_HOST | localhost | Database host |
 | DB_PORT | 5432 | Database port |
 | DB_USER | weather | Database user |
-| DB_PASSWORD | weather123 | Database password |
+| DB_PASSWORD | (required) | Database password |
 | DB_NAME | weather_service | Database name |
 | DB_SSLMODE | disable | SSL mode |
 | NWS_BASE_URL | https://api.weather.gov | NWS API URL |
@@ -742,7 +742,7 @@ kubectl create namespace weather-service
 kubectl create serviceaccount weather-service -n weather-service
 kubectl create secret generic weather-service-db \
   --from-literal=host=localhost \
-  --from-literal=password=weather123 \
+  --from-literal=password=${DB_PASSWORD} \
   -n weather-service
 
 # Apply manifests
@@ -856,7 +856,7 @@ kubectl create namespace weather-service
 kubectl create serviceaccount weather-service -n weather-service
 kubectl create secret generic weather-service-db \
   --from-literal=host=localhost \
-  --from-literal=password=weather123 \
+  --from-literal=password=${DB_PASSWORD} \
   -n weather-service
 
 # Update manifests with project ID
